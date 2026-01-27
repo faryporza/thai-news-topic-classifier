@@ -61,7 +61,11 @@ def load_models():
 
 
 # Load models at module level (for gunicorn)
-load_models()
+# Load models at module level (for gunicorn)
+try:
+    load_models()
+except Exception as e:
+    print(f"❌ Error loading models during startup: {e}")
 
 
 # ============================================================================
