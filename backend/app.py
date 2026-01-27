@@ -158,13 +158,14 @@ def predict():
     {
         "label": "Business",
         "confidence": 0.95,
-        "probabilities": {
-            "Business": 0.95,
-            "SciTech": 0.03,
-            "World": 0.02
-        }
+        "probabilities": {...},
+        "latency_ms": 45,
+        "model_version": "1.0.0"
     }
     """
+    import time
+    start_time = time.time()
+    
     # ตรวจสอบว่าโหลดโมเดลแล้วหรือยัง
     if vectorizer is None or model is None:
         return jsonify({
@@ -203,6 +204,10 @@ def predict():
     prediction = model.predict(X)[0]
     probabilities = model.predict_proba(X)[0]
     
+    # Calculate latency
+    end_time = time.time()
+    latency_ms = round((end_time - start_time) * 1000, 2)
+    
     # สร้าง response
     classes = model.classes_
     prob_dict = {cls: float(prob) for cls, prob in zip(classes, probabilities)}
@@ -212,6 +217,8 @@ def predict():
         "label": prediction,
         "confidence": confidence,
         "probabilities": prob_dict,
+        "latency_ms": latency_ms,
+        "model_version": model_info["version"],
         "input": {
             "headline": headline[:100] + "..." if len(headline) > 100 else headline,
             "body": body[:200] + "..." if len(body) > 200 else body
