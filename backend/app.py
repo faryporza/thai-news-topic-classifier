@@ -60,6 +60,10 @@ def load_models():
         return False
 
 
+# Load models at module level (for gunicorn)
+load_models()
+
+
 # ============================================================================
 # Text Preprocessing (same as training)
 # ============================================================================
@@ -232,4 +236,4 @@ if __name__ == '__main__':
     print("   URL: http://localhost:5000")
     print("=" * 60)
     
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=True)

@@ -1,16 +1,72 @@
-# React + Vite
+# 🇹🇭 Thai News Topic Classifier - Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Vite React Frontend สำหรับระบบจำแนกหมวดหมู่ข่าวภาษาไทย
 
-Currently, two official plugins are available:
+## 🚀 วิธีการรัน
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### 1. ติดตั้ง Dependencies
 
-## React Compiler
+```bash
+cd frontend
+npm install
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 2. ตั้งค่า Environment Variables
 
-## Expanding the ESLint configuration
+สร้างไฟล์ `.env` จาก `.env.example`:
+```bash
+cp .env.example .env
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+แก้ไข `.env` ตามต้องการ:
+```env
+VITE_API_URL=http://localhost:5001
+```
+
+### 3. รัน Development Server
+
+```bash
+npm run dev
+```
+
+เปิดเบราว์เซอร์ที่ http://localhost:5173
+
+### 3. Build สำหรับ Production
+
+```bash
+npm run build
+```
+
+ไฟล์ build จะอยู่ที่ `dist/`
+
+## ⚠️ สำคัญ
+
+ต้องรัน Backend API ก่อน:
+```bash
+cd ../backend
+python app.py
+```
+
+Backend จะรันที่ http://localhost:5000
+
+## 🎨 Features
+
+- ✅ กรอก Headline และ Body
+- ✅ แสดง Label (หมวดหมู่ข่าว)
+- ✅ แสดงค่า Confidence
+- ✅ แสดง Probability แบบ Bar Chart
+- ✅ แสดงข้อมูลโมเดล
+- ✅ ตรวจสอบสถานะ API
+
+## 📁 โครงสร้าง
+
+```
+frontend/
+├── src/
+│   ├── App.jsx     # Main Component
+│   ├── App.css     # Styles
+│   └── main.jsx    # Entry Point
+├── index.html
+├── package.json
+└── vite.config.js
+```
