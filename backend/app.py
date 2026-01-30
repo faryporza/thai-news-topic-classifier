@@ -1,29 +1,31 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Thai News Topic Classifier - Backend API (WangchanBERTa Edition)
-================================================================
-Flask API สำหรับจำแนกหมวดหมู่ข่าวภาษาไทย ด้วย WangchanBERTa
+Thai News Topic Classifier - Backend API (ONNX Edition)
+=======================================================
+Flask API สำหรับจำแนกหมวดหมู่ข่าวภาษาไทย ด้วย ONNX Runtime
 
 Endpoints:
 - GET /health - ตรวจสอบสถานะ API
 - GET /model/info - ข้อมูลโมเดล
 - POST /predict - ทำนายหมวดหมู่ข่าว
 
-Model: farypor/my-thai-news-classifier (Hugging Face Hub)
+Model: farypor/my-thai-news-classifier-onnx (ONNX on Hugging Face Hub)
 - ความแม่นยำ: ~95-100%
-- เข้าใจบริบทภาษาไทย
-- รองรับ Mixed Signal และ Typo
+- Inference เร็วกว่า PyTorch 2-3x
+- ไม่ต้องใช้ GPU
 """
 
 import os
 import re
 import time
-import torch
+import numpy as np
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from huggingface_hub import snapshot_download
+import onnxruntime as ort
+from transformers import AutoTokenizer
 
 # ============================================================================
 # Flask App Configuration
@@ -32,65 +34,70 @@ app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
 # ============================================================================
-# Load Model from Hugging Face Hub
+# Load Model from Hugging Face Hub (ONNX)
 # ============================================================================
-MODEL_ID = "farypor/my-thai-news-classifier"
+REPO_ID = "farypor/my-thai-news-classifier-onnx"
+LOCAL_DIR = "onnx_model"
+MAX_LENGTH = 256
 
 # Global model and tokenizer
 tokenizer = None
-model = None
-device = None
+session = None
+
+# Label mapping
+ID2LABEL = {0: "Business", 1: "SciTech", 2: "World"}
+LABEL2ID = {"Business": 0, "SciTech": 1, "World": 2}
 
 model_info = {
     "name": "Thai News Topic Classifier",
-    "version": "2.0.0",
-    "algorithm": "WangchanBERTa",
-    "model_type": "WangchanBERTa (Transformer)",
-    "model_id": MODEL_ID,
+    "version": "2.1.0",
+    "algorithm": "WangchanBERTa + ONNX",
+    "model_type": "ONNX Runtime",
+    "model_id": REPO_ID,
     "base_model": "airesearch/wangchanberta-base-att-spm-uncased",
     "classes": ["Business", "SciTech", "World"],
-    "created_at": "2026-01-30",
-    "description": "โมเดลจำแนกหมวดหมู่ข่าวภาษาไทย 3 หมวด ด้วย WangchanBERTa",
+    "created_at": "2026-01-31",
+    "description": "โมเดลจำแนกหมวดหมู่ข่าวภาษาไทย 3 หมวด ด้วย ONNX Runtime",
     "advantages": [
-        "เข้าใจบริบท (Contextual Understanding)",
-        "รองรับ Mixed Signal",
-        "ทนต่อ Typo",
-        "Subword Tokenization"
+        "Inference เร็วกว่า PyTorch 2-3x",
+        "ไม่ต้องใช้ GPU",
+        "ไฟล์เล็กลง",
+        "Deploy ง่าย"
     ],
     "accuracy": "100% (บน test set)",
-    "max_length": 256
+    "max_length": MAX_LENGTH
 }
 
 
 def load_models():
-    """โหลด WangchanBERTa Model และ Tokenizer จาก Hugging Face Hub"""
-    global tokenizer, model, device
+    """โหลด ONNX Model และ Tokenizer จาก Hugging Face Hub"""
+    global tokenizer, session
     
     try:
-        # Determine device
-        if torch.cuda.is_available():
-            device = torch.device('cuda')
-        elif torch.backends.mps.is_available():
-            device = torch.device('mps')
-        else:
-            device = torch.device('cpu')
+        # Download model from Hugging Face Hub
+        print(f"📥 Downloading model from {REPO_ID}...")
+        snapshot_download(
+            repo_id=REPO_ID,
+            repo_type="model",
+            local_dir=LOCAL_DIR,
+            local_dir_use_symlinks=False
+        )
+        print(f"   ✅ Downloaded to {LOCAL_DIR}")
         
-        print(f"🔧 Using device: {device}")
+        # Load tokenizer
+        tokenizer_path = os.path.join(LOCAL_DIR, "tokenizer")
+        print(f"📥 Loading tokenizer from {tokenizer_path}...")
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_path, use_fast=True)
         
-        # Load tokenizer and model from Hugging Face Hub
-        print(f"📥 Loading tokenizer from {MODEL_ID}...")
-        tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
+        # Load ONNX model
+        onnx_path = os.path.join(LOCAL_DIR, "model.onnx")
+        print(f"📥 Loading ONNX model from {onnx_path}...")
+        session = ort.InferenceSession(onnx_path, providers=["CPUExecutionProvider"])
         
-        print(f"📥 Loading WangchanBERTa model from {MODEL_ID}...")
-        model = AutoModelForSequenceClassification.from_pretrained(MODEL_ID)
-        model.to(device)
-        model.eval()  # Set to evaluation mode
-        
-        print(f"✅ WangchanBERTa model loaded successfully!")
-        print(f"   - Model ID: {MODEL_ID}")
-        print(f"   - Model type: {model.config.model_type}")
-        print(f"   - Num labels: {model.config.num_labels}")
-        print(f"   - Labels: {model.config.id2label}")
+        print(f"✅ ONNX model loaded successfully!")
+        print(f"   - Model ID: {REPO_ID}")
+        print(f"   - Provider: CPUExecutionProvider")
+        print(f"   - Labels: {ID2LABEL}")
         
         return True
         
@@ -133,6 +140,12 @@ def preprocess_text(text: str) -> str:
     return text
 
 
+def softmax(x):
+    """Compute softmax values"""
+    exp_x = np.exp(x - np.max(x, axis=1, keepdims=True))
+    return exp_x / np.sum(exp_x, axis=1, keepdims=True)
+
+
 # ============================================================================
 # API Endpoints
 # ============================================================================
@@ -141,8 +154,8 @@ def home():
     """Home endpoint"""
     return jsonify({
         "message": "Thai News Topic Classifier API",
-        "version": "2.0.0",
-        "model": "WangchanBERTa",
+        "version": "2.1.0",
+        "model": "ONNX Runtime",
         "endpoints": [
             "GET /health",
             "GET /model/info",
@@ -157,14 +170,14 @@ def health():
     Health Check Endpoint
     ตรวจสอบสถานะ API และโมเดล
     """
-    model_loaded = tokenizer is not None and model is not None
+    model_loaded = tokenizer is not None and session is not None
     
     return jsonify({
         "status": "healthy" if model_loaded else "unhealthy",
         "timestamp": datetime.now().isoformat(),
         "model_loaded": model_loaded,
-        "model_type": "WangchanBERTa" if model_loaded else None,
-        "device": str(device) if device else None
+        "model_type": "ONNX Runtime" if model_loaded else None,
+        "provider": "CPUExecutionProvider" if model_loaded else None
     }), 200 if model_loaded else 503
 
 
@@ -174,7 +187,7 @@ def get_model_info():
     Model Info Endpoint
     แสดงข้อมูลโมเดล
     """
-    if tokenizer is None or model is None:
+    if tokenizer is None or session is None:
         return jsonify({
             "error": "Model not loaded"
         }), 503
@@ -183,9 +196,7 @@ def get_model_info():
     info = model_info.copy()
     info["vocabulary_size"] = len(tokenizer)
     info["model_loaded"] = True
-    info["device"] = str(device)
-    info["id2label"] = model.config.id2label
-    info["num_parameters"] = sum(p.numel() for p in model.parameters())
+    info["id2label"] = ID2LABEL
     
     return jsonify(info)
 
@@ -194,7 +205,7 @@ def get_model_info():
 def predict():
     """
     Predict Endpoint
-    ทำนายหมวดหมู่ข่าวด้วย WangchanBERTa
+    ทำนายหมวดหมู่ข่าวด้วย ONNX Runtime
     
     Request Body:
     {
@@ -207,18 +218,18 @@ def predict():
         "label": "Business",
         "confidence": 0.95,
         "probabilities": {...},
-        "latency_ms": 45,
-        "model_version": "2.0.0",
-        "model_type": "WangchanBERTa"
+        "latency_ms": 15,
+        "model_version": "2.1.0",
+        "model_type": "ONNX Runtime"
     }
     """
     start_time = time.time()
     
     # ตรวจสอบว่าโหลดโมเดลแล้วหรือยัง
-    if tokenizer is None or model is None:
+    if tokenizer is None or session is None:
         return jsonify({
             "error": "Model not loaded",
-            "message": "กรุณาตรวจสอบว่าไฟล์โมเดลอยู่ใน /backend/models"
+            "message": "กรุณารอโมเดลโหลดเสร็จ"
         }), 503
     
     # รับ request data
@@ -248,32 +259,35 @@ def predict():
     # Tokenize
     inputs = tokenizer(
         text,
-        return_tensors="pt",
+        return_tensors="np",
         truncation=True,
-        max_length=256,
-        padding=True
+        max_length=MAX_LENGTH,
+        padding="max_length"
     )
     
-    # Move to device
-    inputs = {k: v.to(device) for k, v in inputs.items()}
+    # Run ONNX inference
+    logits = session.run(
+        None,
+        {
+            "input_ids": inputs["input_ids"],
+            "attention_mask": inputs["attention_mask"]
+        }
+    )[0]
     
-    # Predict with WangchanBERTa
-    with torch.no_grad():
-        outputs = model(**inputs)
-        logits = outputs.logits
-        probs = torch.softmax(logits, dim=1)[0]
-        predicted_id = torch.argmax(probs).item()
+    # Calculate probabilities
+    probs = softmax(logits)[0]
+    predicted_id = int(np.argmax(probs))
     
     # Calculate latency
     end_time = time.time()
     latency_ms = round((end_time - start_time) * 1000, 2)
     
     # Build response
-    predicted_label = model.config.id2label[predicted_id]
+    predicted_label = ID2LABEL[predicted_id]
     confidence = float(probs[predicted_id])
     
     prob_dict = {
-        model.config.id2label[i]: float(probs[i])
+        ID2LABEL[i]: float(probs[i])
         for i in range(len(probs))
     }
     
@@ -283,7 +297,7 @@ def predict():
         "probabilities": prob_dict,
         "latency_ms": latency_ms,
         "model_version": model_info["version"],
-        "model_type": "WangchanBERTa",
+        "model_type": "ONNX Runtime",
         "input": {
             "headline": headline[:100] + "..." if len(headline) > 100 else headline,
             "body": body[:200] + "..." if len(body) > 200 else body
@@ -297,14 +311,13 @@ def predict():
 if __name__ == '__main__':
     print("=" * 60)
     print("🇹🇭 Thai News Topic Classifier API")
-    print("   Model: WangchanBERTa (v2.0.0)")
+    print("   Model: ONNX Runtime (v2.1.0)")
     print("=" * 60)
     
     # Load models
     if load_models():
-        print(f"   Classes: {list(model.config.id2label.values())}")
+        print(f"   Classes: {list(ID2LABEL.values())}")
         print(f"   Vocabulary size: {len(tokenizer)}")
-        print(f"   Device: {device}")
     
     print("\n📡 Starting server...")
     print("   URL: http://localhost:5001")
