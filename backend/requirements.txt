@@ -1,8 +1,7 @@
-# Thai News Topic Classifier - Backend API
 flask>=3.0.0
 flask-cors>=4.0.0
-joblib>=1.3.0
-scikit-learn>=1.3.0
+torch>=2.0.0
+transformers>=4.35.0
+sentencepiece>=0.1.99
 numpy>=1.24.0
-pandas>=2.0.0
-gunicorn>=21.0.0
+protobuf>=3.20.0

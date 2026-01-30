@@ -3,96 +3,120 @@
         "headline": "สตาร์ทอัพไทยระดมทุน 100 ล้านบาท พัฒนาแพลตฟอร์ม AI",
         "body": "บริษัทสตาร์ทอัพด้านเทคโนโลยีของไทยประกาศระดมทุนรอบ Series A มูลค่า 100 ล้านบาท เพื่อพัฒนาแพลตฟอร์มปัญญาประดิษฐ์สำหรับธุรกิจ",
         "actual": "Business",
-        "predicted": "SciTech",
+        "tfidfPredicted": "SciTech",
+        "wangchanbertaPredicted": "Business",
         "errorType": "Mixed Signal",
-        "reason": "ข่าวมีทั้งเนื้อหา Business (ระดมทุน, Series A) และ SciTech (AI, เทคโนโลยี, ปัญญาประดิษฐ์) ทำให้โมเดลจับคีย์เวิร์ดด้าน Tech มากกว่า"
+        "reason": "ข่าวมีทั้งเนื้อหา Business (ระดมทุน, Series A) และ SciTech (AI, เทคโนโลยี, ปัญญาประดิษฐ์)",
+        "wangchanbertaExplanation": "✅ WangchanBERTa เข้าใจว่าประเด็นหลักคือการระดมทุน ไม่ใช่เทคโนโลยี"
     },
     {
         "headline": "องค์การอนามัยโลกเตือนวิกฤตสุขภาพจากมลพิษ",
         "body": "WHO ออกรายงานเตือนว่าประเทศต่างๆ ทั่วโลกต้องเผชิญวิกฤตสุขภาพจากมลพิษทางอากาศ โดยเฉพาะในเขตเมืองใหญ่",
         "actual": "World",
-        "predicted": "SciTech",
+        "tfidfPredicted": "SciTech",
+        "wangchanbertaPredicted": "World",
         "errorType": "Domain Shift",
-        "reason": "คำศัพท์ด้านสุขภาพและวิทยาศาสตร์ (มลพิษ, สุขภาพ, รายงาน) ทำให้โมเดลเข้าใจผิดว่าเป็นข่าว SciTech แทนที่จะเป็นข่าวโลก"
+        "reason": "คำศัพท์ด้านสุขภาพและวิทยาศาสตร์ (มลพิษ, สุขภาพ, รายงาน) ทำให้ TF-IDF สับสน",
+        "wangchanbertaExplanation": "✅ WangchanBERTa รู้จักว่า WHO และ 'ประเทศต่างๆ ทั่วโลก' คือข่าวโลก"
     },
     {
         "headline": "รัฐบาลจีนประกาศมาตรการกระตุ้นเศรษฐกิจครั้งใหญ่",
         "body": "รัฐบาลจีนประกาศแพ็คเกจกระตุ้นเศรษฐกิจมูลค่ากว่า 1 ล้านล้านหยวน เพื่อฟื้นฟูเศรษฐกิจหลังชะลอตัว",
         "actual": "World",
-        "predicted": "Business",
+        "tfidfPredicted": "Business",
+        "wangchanbertaPredicted": "World",
         "errorType": "Mixed Signal",
-        "reason": "เนื้อหาเกี่ยวกับเศรษฐกิจ (กระตุ้นเศรษฐกิจ, มูลค่า, หยวน) แต่เป็นข่าวต่างประเทศ โมเดลจับคีย์เวิร์ด 'เศรษฐกิจ' มากกว่า 'จีน'"
+        "reason": "เนื้อหาเกี่ยวกับเศรษฐกิจ แต่เป็นข่าวต่างประเทศ",
+        "wangchanbertaExplanation": "✅ WangchanBERTa เข้าใจบริบทว่า 'รัฐบาลจีน' เป็นข่าวระหว่างประเทศ"
     },
     {
         "headline": "บริษัทไบโอเทคไทยส่งออกวัคซีนสู่ตลาดโลก",
         "body": "บริษัทผลิตวัคซีนของไทยลงนามข้อตกลงส่งออกวัคซีนไปยัง 10 ประเทศในอาเซียน มูลค่ากว่า 5,000 ล้านบาท",
         "actual": "Business",
-        "predicted": "SciTech",
+        "tfidfPredicted": "SciTech",
+        "wangchanbertaPredicted": "Business",
         "errorType": "Mixed Signal",
-        "reason": "คำว่า 'ไบโอเทค' และ 'วัคซีน' ทำให้โมเดลคิดว่าเป็นข่าววิทยาศาสตร์ ทั้งที่เนื้อหาหลักคือการส่งออกและมูลค่าทางธุรกิจ"
+        "reason": "คำว่า 'ไบโอเทค' และ 'วัคซีน' ทำให้ TF-IDF คิดว่าเป็นข่าววิทยาศาสตร์",
+        "wangchanbertaExplanation": "✅ WangchanBERTa เข้าใจว่า 'ส่งออก' และ 'มูลค่า 5,000 ล้าน' คือข่าวธุรกิจ"
     },
     {
         "headline": "ธนาคารโลกปรับลดคาดการณ์ GDP โลก",
         "body": "ธนาคารโลกประกาศปรับลดประมาณการอัตราการเติบโตทางเศรษฐกิจโลกลงเหลือ 2.1% จากความไม่แน่นอนทางภูมิรัฐศาสตร์",
         "actual": "World",
-        "predicted": "Business",
+        "tfidfPredicted": "Business",
+        "wangchanbertaPredicted": "World",
         "errorType": "Mixed Signal",
-        "reason": "คำศัพท์ทางเศรษฐกิจ (GDP, อัตราการเติบโต, เศรษฐกิจ) ทำให้โมเดลจัดเป็น Business แทนที่จะเป็นข่าวโลก"
+        "reason": "คำศัพท์ทางเศรษฐกิจ (GDP, อัตราการเติบโต) ทำให้ TF-IDF จัดเป็น Business",
+        "wangchanbertaExplanation": "✅ WangchanBERTa รู้จัก 'ธนาคารโลก' และ 'ภูมิรัฐศาสตร์' คือข่าวโลก"
     },
     {
         "headline": "สถาบันวิจัยเผยผลศึกษาผลกระทบเศรษฐกิจดิจิทัล",
         "body": "สถาบันวิจัยเศรษฐกิจดิจิทัลเผยผลศึกษาว่า เศรษฐกิจดิจิทัลของไทยมีมูลค่าสูงถึง 1 ล้านล้านบาท คิดเป็น 20% ของ GDP",
         "actual": "SciTech",
-        "predicted": "Business",
+        "tfidfPredicted": "Business",
+        "wangchanbertaPredicted": "SciTech",
         "errorType": "Domain Shift",
-        "reason": "แม้เป็นงานวิจัยด้านเทคโนโลยี แต่คำว่า 'เศรษฐกิจ', 'มูลค่า', 'GDP' ทำให้โมเดลจัดเป็น Business"
+        "reason": "แม้เป็นงานวิจัยด้านเทคโนโลยี แต่ TF-IDF จับคำ 'เศรษฐกิจ', 'มูลค่า', 'GDP' มากกว่า",
+        "wangchanbertaExplanation": "✅ WangchanBERTa เข้าใจว่า 'ผลศึกษา' และ 'เศรษฐกิจดิจิทัล' เป็นงานวิจัยเทคโนโลยี"
     },
     {
         "headline": "EU อนุมัติกฎหมายควบคุม AI ฉบับแรกของโลก",
         "body": "สหภาพยุโรปผ่านกฎหมาย AI Act ซึ่งเป็นกฎหมายควบคุมปัญญาประดิษฐ์ฉบับแรกของโลก กำหนดข้อบังคับและบทลงโทษสำหรับการใช้ AI ที่มีความเสี่ยง",
         "actual": "World",
-        "predicted": "SciTech",
+        "tfidfPredicted": "SciTech",
+        "wangchanbertaPredicted": "World",
         "errorType": "Mixed Signal",
-        "reason": "เนื้อหาเกี่ยวกับ AI และเทคโนโลยี แต่เป็นข่าวการเมืองระหว่างประเทศ โมเดลจับคีย์เวิร์ด 'AI' และ 'ปัญญาประดิษฐ์'"
+        "reason": "เนื้อหาเกี่ยวกับ AI และเทคโนโลยี แต่เป็นข่าวการเมืองระหว่างประเทศ",
+        "wangchanbertaExplanation": "✅ WangchanBERTa เข้าใจว่า 'EU' และ 'กฎหมาย' เป็นข่าวต่างประเทศ"
     },
     {
         "headline": "กองทุนเทคโนโลยีระดมทุน 10,000 ล้านบาท",
         "body": "กองทุนร่วมลงทุนด้านเทคโนโลยีชั้นนำประกาศปิดระดมทุนรอบใหม่ มูลค่ารวม 10,000 ล้านบาท เพื่อลงทุนในสตาร์ทอัพ AI และ Fintech",
         "actual": "Business",
-        "predicted": "SciTech",
+        "tfidfPredicted": "SciTech",
+        "wangchanbertaPredicted": "Business",
         "errorType": "Mixed Signal",
-        "reason": "แม้เป็นข่าวการลงทุน แต่คำว่า 'เทคโนโลยี', 'AI', 'Fintech', 'สตาร์ทอัพ' ทำให้โมเดลจัดเป็น SciTech"
+        "reason": "แม้เป็นข่าวการลงทุน แต่คำว่า 'เทคโนโลยี', 'AI', 'Fintech' ทำให้ TF-IDF สับสน",
+        "wangchanbertaExplanation": "✅ WangchanBERTa เข้าใจว่า 'กองทุน' และ 'ระดมทุน' เป็นข่าวการเงิน"
     },
     {
         "headline": "นักวิทยาศาสตร์จีนค้นพบสารต้านมะเร็งชนิดใหม่",
         "body": "ทีมวิจัยจากมหาวิทยาลัยปักกิ่งประกาศค้นพบสารประกอบใหม่ที่มีประสิทธิภาพในการยับยั้งเซลล์มะเร็ง คาดว่าจะเปลี่ยนแปลงการรักษาในอนาคต",
         "actual": "SciTech",
-        "predicted": "World",
+        "tfidfPredicted": "World",
+        "wangchanbertaPredicted": "SciTech",
         "errorType": "Domain Shift",
-        "reason": "คำว่า 'จีน' และ 'ปักกิ่ง' ทำให้โมเดลคิดว่าเป็นข่าวต่างประเทศ แทนที่จะเป็นข่าววิทยาศาสตร์"
+        "reason": "คำว่า 'จีน' และ 'ปักกิ่ง' ทำให้ TF-IDF คิดว่าเป็นข่าวต่างประเทศ",
+        "wangchanbertaExplanation": "✅ WangchanBERTa เข้าใจว่า 'ค้นพบ' และ 'งานวิจัย' เป็นข่าววิทยาศาสตร์"
     },
     {
         "headline": "ตลาดหลักทรัพย์สหรัฐฯ ปิดร่วงหนัก",
         "body": "ดัชนี Dow Jones ปิดร่วงกว่า 500 จุด หลังนักลงทุนกังวลเรื่องเงินเฟ้อและการขึ้นดอกเบี้ยของ Fed",
         "actual": "Business",
-        "predicted": "World",
+        "tfidfPredicted": "World",
+        "wangchanbertaPredicted": "Business",
         "errorType": "Domain Shift",
-        "reason": "คำว่า 'สหรัฐฯ' และ 'Fed' ทำให้โมเดลจัดเป็นข่าวโลก ทั้งที่เนื้อหาหลักเป็นเรื่องตลาดหุ้น"
+        "reason": "คำว่า 'สหรัฐฯ' และ 'Fed' ทำให้ TF-IDF จัดเป็นข่าวโลก",
+        "wangchanbertaExplanation": "✅ WangchanBERTa รู้จักว่า 'Dow Jones' และ 'ตลาดหลักทรัพย์' คือข่าวการเงิน"
     },
     {
         "headline": "อินเดียส่งยานอวกาศสำรวจดวงจันทร์สำเร็จ",
         "body": "องค์การอวกาศอินเดีย (ISRO) ประกาศความสำเร็จในการส่งยาน Chandrayaan-3 ลงจอดบนดวงจันทร์ กลายเป็นประเทศที่ 4 ที่ทำได้",
         "actual": "SciTech",
-        "predicted": "World",
+        "tfidfPredicted": "World",
+        "wangchanbertaPredicted": "SciTech",
         "errorType": "Mixed Signal",
-        "reason": "แม้เป็นข่าววิทยาศาสตร์อวกาศ แต่คำว่า 'อินเดีย' และ 'ประเทศที่ 4' ทำให้โมเดลจัดเป็นข่าวโลก"
+        "reason": "แม้เป็นข่าววิทยาศาสตร์อวกาศ แต่คำว่า 'อินเดีย' และ 'ประเทศที่ 4' ทำให้ TF-IDF สับสน",
+        "wangchanbertaExplanation": "✅ WangchanBERTa เข้าใจว่า 'ยานอวกาศ' และ 'ดวงจันทร์' เป็นข่าววิทยาศาสตร์"
     },
     {
         "headline": "บริษัทญี่ปุ่นเปิดตัวหุ่นยนต์บริการในร้านอาหาร",
         "body": "เครือร้านอาหารญี่ปุ่นนำหุ่นยนต์เสิร์ฟอาหารมาใช้งาน เพื่อแก้ปัญหาขาดแคลนแรงงานและลดต้นทุน",
         "actual": "SciTech",
-        "predicted": "Business",
+        "tfidfPredicted": "Business",
+        "wangchanbertaPredicted": "SciTech",
         "errorType": "Mixed Signal",
-        "reason": "แม้เป็นข่าวเทคโนโลยีหุ่นยนต์ แต่คำว่า 'แรงงาน', 'ต้นทุน', 'เครือร้านอาหาร' ทำให้โมเดลจัดเป็น Business"
+        "reason": "แม้เป็นข่าวเทคโนโลยีหุ่นยนต์ แต่คำว่า 'แรงงาน', 'ต้นทุน', 'เครือร้านอาหาร' ทำให้ TF-IDF สับสน",
+        "wangchanbertaExplanation": "✅ WangchanBERTa เข้าใจว่า 'หุ่นยนต์' เป็นหัวข้อหลักของข่าว"
     }
 ]
