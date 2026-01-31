@@ -11,15 +11,16 @@ import {
   Newspaper,
   Shuffle,
   Clock,
-  AlertTriangle,
-  XCircle
+  Sparkles,
+  Loader2,
+  MessageSquare
 } from 'lucide-react';
 import './index.css';
+import ReactMarkdown from 'react-markdown';
+import { analyzePrediction, checkRateLimit } from './services/llmAnalysis';
 
 // Import data from JSON files
 import SAMPLE_NEWS from './data/sampleNews.json';
-import MISCLASSIFIED_EXAMPLES from './data/misclassifiedExamples.json';
-
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
 export default function App() {
@@ -30,7 +31,20 @@ export default function App() {
   const [error, setError] = useState(null);
   const [apiStatus, setApiStatus] = useState('checking');
   const [modelInfo, setModelInfo] = useState(null);
-  const [showErrorAnalysis, setShowErrorAnalysis] = useState(false);
+
+  // LLM Analysis State
+  const [llmAnalysis, setLlmAnalysis] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [trueLabel, setTrueLabel] = useState('');
+  const [rateLimit, setRateLimit] = useState({ remainingRequests: 2, resetTime: 0 });
+
+  // Update rate limit on mount and periodically
+  useEffect(() => {
+    const updateRateLimit = () => setRateLimit(checkRateLimit());
+    updateRateLimit();
+    const interval = setInterval(updateRateLimit, 5000); // ทุก 5 วินาที
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     checkHealth();
@@ -65,6 +79,8 @@ export default function App() {
     setBody(sample.body);
     setResult(null);
     setError(null);
+    setLlmAnalysis(null);
+    setTrueLabel('');
   };
 
   const handlePredict = async () => {
@@ -73,6 +89,7 @@ export default function App() {
     setIsLoading(true);
     setError(null);
     setResult(null);
+    setLlmAnalysis(null);
 
     try {
       const res = await fetch(`${API_URL}/predict`, {
@@ -109,7 +126,17 @@ export default function App() {
           prediction: probabilities[0],
           probabilities: probabilities,
           latency_ms: data.latency_ms,
-          model_version: data.model_version
+          model_version: data.model_version,
+          model_type: data.model_type,
+          // Keep raw data for LLM analysis
+          raw: {
+            label: data.label,
+            confidence: data.confidence,
+            probabilities: data.probabilities,
+            latency_ms: data.latency_ms,
+            model_version: data.model_version,
+            model_type: data.model_type
+          }
         });
       } else {
         setError(data.message || data.error || 'เกิดข้อผิดพลาด');
@@ -121,92 +148,39 @@ export default function App() {
     }
   };
 
+  // LLM Error Analysis
+  const handleLLMAnalysis = async () => {
+    if (!result) return;
+
+    setIsAnalyzing(true);
+    setLlmAnalysis(null);
+
+    const analysisResult = await analyzePrediction({
+      headline,
+      body,
+      prediction: result.raw,
+      trueLabel: trueLabel || null
+    });
+
+    setLlmAnalysis(analysisResult);
+    setIsAnalyzing(false);
+
+    // Update rate limit state
+    if (analysisResult.rateLimit) {
+      setRateLimit(analysisResult.rateLimit);
+    } else {
+      setRateLimit(checkRateLimit());
+    }
+  };
+
   const handleClear = () => {
     setHeadline('');
     setBody('');
     setResult(null);
     setError(null);
+    setLlmAnalysis(null);
+    setTrueLabel('');
   };
-
-  // Error Analysis Page
-  if (showErrorAnalysis) {
-    return (
-      <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
-        <header className="bg-white shadow-sm sticky top-0 z-10 border-b border-slate-200">
-          <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-600 rounded-lg text-white">
-                <AlertTriangle size={24} />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-slate-900">Error Analysis</h1>
-                <p className="text-xs text-slate-500 font-medium">ตัวอย่างที่โมเดลทำนายผิด</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowErrorAnalysis(false)}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 font-medium transition-all"
-            >
-              ← กลับหน้าหลัก
-            </button>
-          </div>
-        </header>
-
-        <main className="max-w-5xl mx-auto px-4 py-8">
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-            <p className="text-amber-800 text-sm">
-              <strong>หมายเหตุ:</strong> ตัวอย่างด้านล่างแสดงกรณีที่โมเดลทำนายผิดพลาด พร้อมการวิเคราะห์สาเหตุและข้อเสนอแนะ
-            </p>
-          </div>
-
-          <div className="space-y-6">
-            {MISCLASSIFIED_EXAMPLES.map((example, index) => (
-              <div key={index} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="bg-red-50 px-6 py-3 border-b border-red-100 flex items-center gap-2">
-                  <XCircle className="w-4 h-4 text-red-500" />
-                  <span className="font-semibold text-red-700">ตัวอย่างที่ {index + 1}</span>
-                </div>
-                <div className="p-6 space-y-4">
-                  <div>
-                    <label className="text-xs font-medium text-slate-500 uppercase">Headline</label>
-                    <p className="text-slate-800 font-medium">{example.headline}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-slate-500 uppercase">Body</label>
-                    <p className="text-slate-600 text-sm">{example.body}</p>
-                  </div>
-                  <div className="flex gap-4 pt-2">
-                    <div className="flex-1 bg-green-50 rounded-lg p-3 border border-green-200">
-                      <span className="text-xs text-green-600 font-medium">Actual Label</span>
-                      <p className="text-green-800 font-bold text-lg">{example.actual}</p>
-                    </div>
-                    <div className="flex-1 bg-red-50 rounded-lg p-3 border border-red-200">
-                      <span className="text-xs text-red-600 font-medium">Predicted Label</span>
-                      <p className="text-red-800 font-bold text-lg">{example.predicted}</p>
-                    </div>
-                  </div>
-                  <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                    <span className="text-xs font-medium text-slate-500 uppercase">การวิเคราะห์สาเหตุ</span>
-                    <p className="text-slate-700 mt-1">{example.reason}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-8 bg-indigo-50 border border-indigo-200 rounded-lg p-6">
-            <h3 className="font-bold text-indigo-800 mb-3">💡 ข้อเสนอแนะในการปรับปรุง</h3>
-            <ul className="space-y-2 text-indigo-700 text-sm">
-              <li>• ใช้ Pre-trained Thai Language Model (เช่น WangchanBERTa) เพื่อเข้าใจบริบทดีขึ้น</li>
-              <li>• เพิ่มข้อมูล Training ที่มีความหลากหลายมากขึ้น</li>
-              <li>• พิจารณาใช้ Multi-label Classification สำหรับข่าวที่มีหลายหมวดหมู่</li>
-              <li>• เพิ่ม Feature จาก subtopic เพื่อช่วยแยกแยะ</li>
-            </ul>
-          </div>
-        </main>
-      </div>
-    );
-  }
 
   // Main Page
   return (
@@ -223,13 +197,6 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowErrorAnalysis(true)}
-              className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-semibold border border-amber-200 hover:bg-amber-100 transition-all"
-            >
-              <AlertTriangle size={14} />
-              Error Analysis
-            </button>
             <div className={`hidden sm:flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border ${apiStatus === 'online'
               ? 'bg-green-50 text-green-700 border-green-200'
               : apiStatus === 'offline'
@@ -329,14 +296,104 @@ export default function App() {
             </div>
           </div>
 
-          {/* Mobile Error Analysis Link */}
-          <button
-            onClick={() => setShowErrorAnalysis(true)}
-            className="sm:hidden w-full flex items-center justify-center gap-2 p-4 bg-amber-50 text-amber-700 rounded-lg text-sm font-semibold border border-amber-200"
-          >
-            <AlertTriangle size={16} />
-            ดูหน้า Error Analysis
-          </button>
+          {/* LLM Error Analysis Panel */}
+          {result && (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="bg-gradient-to-r from-purple-50 to-indigo-50 px-6 py-4 border-b border-slate-200 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-purple-500" />
+                <h2 className="font-semibold text-purple-700">🔍 AI Error Analysis</h2>
+              </div>
+
+              <div className="p-6 space-y-4">
+                {/* True Label Input */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Label ที่ถูกต้อง (ถ้าโมเดลทายผิด)
+                  </label>
+                  <div className="flex gap-2">
+                    {['Business', 'SciTech', 'World'].map((label) => (
+                      <button
+                        key={label}
+                        onClick={() => setTrueLabel(label === trueLabel ? '' : label)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border ${trueLabel === label
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                          }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    เลือกหมวดที่ถูกต้อง ถ้าต้องการให้ AI วิเคราะห์ว่าทำไมโมเดลถึงทายผิด
+                  </p>
+                </div>
+
+                {/* Rate Limit Indicator */}
+                <div className={`flex items-center justify-between text-xs px-2 py-1 rounded ${rateLimit.remainingRequests > 0
+                    ? 'bg-slate-100 text-slate-600'
+                    : 'bg-amber-100 text-amber-700'
+                  }`}>
+                  <span>
+                    {rateLimit.remainingRequests > 0
+                      ? `🔋 เหลือ ${rateLimit.remainingRequests} ครั้ง/นาที`
+                      : `⏳ รออีก ${rateLimit.resetTime} วินาที`
+                    }
+                  </span>
+                  <span className="text-slate-400">Rate limit: 2 ครั้ง/นาที</span>
+                </div>
+
+                {/* Analyze Button */}
+                <button
+                  onClick={handleLLMAnalysis}
+                  disabled={isAnalyzing || rateLimit.remainingRequests === 0}
+                  className={`w-full flex items-center justify-center gap-2 py-3 px-6 rounded-lg font-semibold text-white transition-all shadow-md hover:shadow-lg ${isAnalyzing || rateLimit.remainingRequests === 0
+                      ? 'bg-purple-400 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 active:scale-95'
+                    }`}
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      กำลังวิเคราะห์ด้วย AI...
+                    </>
+                  ) : rateLimit.remainingRequests === 0 ? (
+                    <>
+                      <Clock size={20} />
+                      รอ {rateLimit.resetTime} วินาที
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={20} />
+                      Analyze with AI
+                    </>
+                  )}
+                </button>
+
+                {/* LLM Analysis Result */}
+                {llmAnalysis && (
+                  <div className={`p-4 rounded-lg border ${llmAnalysis.error
+                    ? 'bg-red-50 border-red-200'
+                    : 'bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200'
+                    }`}>
+                    {llmAnalysis.error ? (
+                      <p className="text-red-700 text-sm">{llmAnalysis.error}</p>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 text-purple-700 font-semibold">
+                          <MessageSquare className="w-4 h-4" />
+                          AI Analysis Result
+                        </div>
+                        <div className="text-slate-700 text-sm leading-relaxed prose prose-sm prose-slate max-w-none">
+                          <ReactMarkdown>{llmAnalysis.analysis}</ReactMarkdown>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Output Section */}
@@ -416,19 +473,19 @@ export default function App() {
             <div className="space-y-3 text-sm">
               <div className="flex justify-between py-2 border-b border-slate-100">
                 <span className="text-slate-500">Algorithm</span>
-                <span className="font-medium text-slate-900">{modelInfo?.algorithm || 'TF-IDF + Logistic Regression'}</span>
+                <span className="font-medium text-slate-900">{modelInfo?.algorithm || 'WangchanBERTa'}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-slate-100">
+                <span className="text-slate-500">Runtime</span>
+                <span className="font-medium text-slate-900">{modelInfo?.model_type || 'ONNX Runtime'}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-slate-100">
                 <span className="text-slate-500">Classes</span>
                 <span className="font-medium text-slate-900 text-right">{modelInfo?.classes?.join(', ') || 'Business, SciTech, World'}</span>
               </div>
-              <div className="flex justify-between py-2 border-b border-slate-100">
-                <span className="text-slate-500">Vocabulary Size</span>
-                <span className="font-medium text-slate-900">{modelInfo?.vocabulary_size?.toLocaleString() || '-'}</span>
-              </div>
               <div className="flex justify-between py-2">
                 <span className="text-slate-500">Version</span>
-                <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-bold">{modelInfo?.version || '1.0.0'}</span>
+                <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-bold">{modelInfo?.version || '2.1.0'}</span>
               </div>
             </div>
           </div>
@@ -436,7 +493,7 @@ export default function App() {
       </main>
 
       <footer className="max-w-5xl mx-auto px-4 py-8 text-center text-slate-400 text-sm">
-        <p>Thai News Topic Classifier © 2026 | TF-IDF + Logistic Regression</p>
+        <p>Thai News Topic Classifier © 2026 | WangchanBERTa + ONNX Runtime</p>
       </footer>
     </div>
   );
