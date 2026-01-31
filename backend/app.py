@@ -38,7 +38,7 @@ CORS(app)  # Enable CORS for all routes
 # ============================================================================
 REPO_ID = "farypor/my-thai-news-classifier-onnx"
 LOCAL_DIR = "onnx_model"
-MAX_LENGTH = 256
+MAX_LENGTH = 192
 
 # Global model and tokenizer
 tokenizer = None
@@ -257,12 +257,13 @@ def predict():
     text = preprocess_text(text)
     
     # Tokenize
+    # Tokenize (FAST VERSION)
     inputs = tokenizer(
         text,
         return_tensors="np",
         truncation=True,
-        max_length=MAX_LENGTH,
-        padding="max_length"
+        max_length=MAX_LENGTH,   # 128 หรือ 192
+        padding="longest"        # ⭐ สำคัญมาก
     )
     
     # Run ONNX inference
