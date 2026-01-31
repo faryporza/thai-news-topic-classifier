@@ -216,11 +216,11 @@ thai-news-topic-classifier/
 
 | Layer | Technology |
 |-------|------------|
-| **ML Framework** | PyTorch, Transformers, scikit-learn |
-| **Model** | WangchanBERTa (airesearch) |
+| **ML Training** | PyTorch, Transformers |
+| **Inference** | ONNX Runtime |
 | **Backend** | Flask, Gunicorn |
 | **Frontend** | Vite, React 18, Tailwind CSS |
-| **Icons** | Lucide React |
+| **Model Format** | ONNX |
 
 ---
 
