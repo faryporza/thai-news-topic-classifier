@@ -122,8 +122,19 @@ export default function App() {
           }))
           .sort((a, b) => b.score - a.score);
 
+        // Use API's final label (after Hybrid Override) instead of max probability
+        const finalLabel = data.label;
+        const finalConfidence = data.confidence * 100;
+
         setResult({
-          prediction: probabilities[0],
+          prediction: {
+            label: finalLabel,
+            score: finalConfidence,
+            icon: iconMap[finalLabel],
+            color: colorMap[finalLabel]?.bg || 'bg-gray-500',
+            text: colorMap[finalLabel]?.text || 'text-gray-600'
+          },
+          hybridOverride: data.hybrid?.override || false,
           probabilities: probabilities,
           latency_ms: data.latency_ms,
           model_version: data.model_version,
