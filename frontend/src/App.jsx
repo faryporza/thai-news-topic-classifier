@@ -331,8 +331,8 @@ export default function App() {
 
                 {/* Rate Limit Indicator */}
                 <div className={`flex items-center justify-between text-xs px-2 py-1 rounded ${rateLimit.remainingRequests > 0
-                    ? 'bg-slate-100 text-slate-600'
-                    : 'bg-amber-100 text-amber-700'
+                  ? 'bg-slate-100 text-slate-600'
+                  : 'bg-amber-100 text-amber-700'
                   }`}>
                   <span>
                     {rateLimit.remainingRequests > 0
@@ -340,7 +340,7 @@ export default function App() {
                       : `⏳ รออีก ${rateLimit.resetTime} วินาที`
                     }
                   </span>
-                  <span className="text-slate-400">Rate limit: 2 ครั้ง/นาที</span>
+                  <span className="text-slate-400">Rate limit: 1 ครั้ง/นาที</span>
                 </div>
 
                 {/* Analyze Button */}
@@ -348,8 +348,8 @@ export default function App() {
                   onClick={handleLLMAnalysis}
                   disabled={isAnalyzing || rateLimit.remainingRequests === 0}
                   className={`w-full flex items-center justify-center gap-2 py-3 px-6 rounded-lg font-semibold text-white transition-all shadow-md hover:shadow-lg ${isAnalyzing || rateLimit.remainingRequests === 0
-                      ? 'bg-purple-400 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 active:scale-95'
+                    ? 'bg-purple-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 active:scale-95'
                     }`}
                 >
                   {isAnalyzing ? (
