@@ -7,6 +7,7 @@ const AZURE_ENDPOINT = import.meta.env.VITE_AZURE_OPENAI_ENDPOINT;
 const AZURE_API_KEY = import.meta.env.VITE_AZURE_OPENAI_API_KEY;
 const AZURE_API_VERSION = import.meta.env.VITE_AZURE_OPENAI_API_VERSION || '2024-04-01-preview';
 const AZURE_DEPLOYMENT = import.meta.env.VITE_AZURE_OPENAI_DEPLOYMENT || 'gpt-5.2-chat';
+const DISCORD_WEBHOOK_URL = import.meta.env.VITE_DISCORD_WEBHOOK_URL;
 
 // Rate Limiting Config
 const RATE_LIMIT_MAX_REQUESTS = 1;  // จำนวนครั้งสูงสุด
@@ -24,6 +25,94 @@ function getDeviceId() {
         localStorage.setItem(DEVICE_ID_KEY, deviceId);
     }
     return deviceId;
+}
+
+/**
+ * ดึง IP Address ของผู้ใช้
+ */
+async function getUserIP() {
+    try {
+        const res = await fetch('https://api.ipify.org?format=json');
+        const data = await res.json();
+        return data.ip;
+    } catch {
+        return 'Unknown';
+    }
+}
+
+/**
+ * ส่ง Log ไปยัง Discord Webhook
+ * @param {Object} params - ข้อมูลสำหรับ log
+ */
+async function sendDiscordLog({ headline, body, prediction, trueLabel, analysis }) {
+    if (!DISCORD_WEBHOOK_URL) {
+        console.warn('Discord webhook URL not configured');
+        return;
+    }
+
+    try {
+        const ip = await getUserIP();
+        const time = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' });
+        const deviceId = getDeviceId();
+
+        // Helper function - Discord requires non-empty field values (min 1 char)
+        const safeValue = (str, maxLen = 1024) => {
+            if (!str || str.trim() === '') return 'N/A';
+            return str.length > maxLen ? str.substring(0, maxLen - 3) + '...' : str;
+        };
+
+        // สร้าง embed สำหรับ Discord
+        const embed = {
+            title: '🔍 AI Error Analysis Log',
+            color: 0x7C3AED, // สีม่วง
+            fields: [
+                {
+                    name: '🖥️ Device Info',
+                    value: `**IP:** ${ip}\n**Device ID:** ${deviceId}\n**Time:** ${time}`,
+                    inline: false
+                },
+                {
+                    name: '📰 Headline',
+                    value: safeValue(headline, 1024),
+                    inline: false
+                },
+                {
+                    name: '📝 Body (Preview)',
+                    value: safeValue(body, 500),
+                    inline: false
+                },
+                {
+                    name: '🤖 Model Prediction',
+                    value: `**Topic:** ${prediction?.label || 'N/A'}\n**Confidence:** ${prediction?.confidence ? (prediction.confidence * 100).toFixed(1) + '%' : 'N/A'}`,
+                    inline: true
+                },
+                {
+                    name: '👤 User Selected',
+                    value: trueLabel || 'ไม่ได้ระบุ',
+                    inline: true
+                },
+                {
+                    name: '✨ AI Analysis',
+                    value: safeValue(analysis, 1024),
+                    inline: false
+                }
+            ],
+            timestamp: new Date().toISOString(),
+            footer: {
+                text: 'Thai News Topic Classifier'
+            }
+        };
+
+        await fetch(DISCORD_WEBHOOK_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ embeds: [embed] })
+        });
+
+        console.log('Discord log sent successfully');
+    } catch (error) {
+        console.error('Failed to send Discord log:', error);
+    }
 }
 
 /**
@@ -148,6 +237,9 @@ export async function analyzePrediction({ headline, body, prediction, trueLabel 
 
         // บันทึก request สำเร็จ
         recordRequest();
+
+        // ส่ง Log ไปยัง Discord (fire and forget)
+        sendDiscordLog({ headline, body, prediction, trueLabel, analysis });
 
         // ดึงข้อมูล rate limit ล่าสุด
         const updatedRateLimit = checkRateLimit();
