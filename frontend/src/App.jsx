@@ -13,7 +13,8 @@ import {
   Clock,
   Sparkles,
   Loader2,
-  MessageSquare
+  MessageSquare,
+  Shield
 } from 'lucide-react';
 import './index.css';
 import ReactMarkdown from 'react-markdown';
@@ -22,6 +23,7 @@ import { analyzePrediction, checkRateLimit } from './services/llmAnalysis';
 // Import data from JSON files
 import SAMPLE_NEWS from './data/sampleNews.json';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY;
 
 export default function App() {
   const [headline, setHeadline] = useState('');
@@ -38,12 +40,37 @@ export default function App() {
   const [trueLabel, setTrueLabel] = useState('');
   const [rateLimit, setRateLimit] = useState({ remainingRequests: 2, resetTime: 0 });
 
+  // Turnstile State
+  const [turnstileToken, setTurnstileToken] = useState(null);
+  const [turnstileLoaded, setTurnstileLoaded] = useState(false);
+
   // Update rate limit on mount and periodically
   useEffect(() => {
     const updateRateLimit = () => setRateLimit(checkRateLimit());
     updateRateLimit();
     const interval = setInterval(updateRateLimit, 5000); // ทุก 5 วินาที
     return () => clearInterval(interval);
+  }, []);
+
+  // Load Turnstile script
+  useEffect(() => {
+    if (!TURNSTILE_SITE_KEY) return;
+
+    // Define global callback for Turnstile
+    window.onTurnstileSuccess = (token) => {
+      setTurnstileToken(token);
+    };
+
+    const script = document.createElement('script');
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+    script.async = true;
+    script.onload = () => setTurnstileLoaded(true);
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+      delete window.onTurnstileSuccess;
+    };
   }, []);
 
   useEffect(() => {
@@ -152,6 +179,12 @@ export default function App() {
   const handleLLMAnalysis = async () => {
     if (!result) return;
 
+    // Check Turnstile token (bot protection)
+    if (TURNSTILE_SITE_KEY && !turnstileToken) {
+      setLlmAnalysis({ error: '⚠️ กรุณายืนยันว่าคุณไม่ใช่หุ่นยนต์ก่อน' });
+      return;
+    }
+
     setIsAnalyzing(true);
     setLlmAnalysis(null);
 
@@ -159,8 +192,15 @@ export default function App() {
       headline,
       body,
       prediction: result.raw,
-      trueLabel: trueLabel || null
+      trueLabel: trueLabel || null,
+      turnstileToken  // ส่ง token ไปด้วย (สำหรับ verify ฝั่ง server ถ้าต้องการ)
     });
+
+    // Reset Turnstile after use
+    if (window.turnstile && TURNSTILE_SITE_KEY) {
+      window.turnstile.reset();
+      setTurnstileToken(null);
+    }
 
     setLlmAnalysis(analysisResult);
     setIsAnalyzing(false);
@@ -343,11 +383,26 @@ export default function App() {
                   <span className="text-slate-400">Rate limit: 1 ครั้ง/นาที</span>
                 </div>
 
+                {/* Cloudflare Turnstile Widget */}
+                {TURNSTILE_SITE_KEY && turnstileLoaded && (
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-green-600" />
+                    <span className="text-xs text-slate-500">Bot Protection by Cloudflare</span>
+                    <div
+                      className="cf-turnstile"
+                      data-sitekey={TURNSTILE_SITE_KEY}
+                      data-callback="onTurnstileSuccess"
+                      data-theme="light"
+                      data-size="compact"
+                    ></div>
+                  </div>
+                )}
+
                 {/* Analyze Button */}
                 <button
                   onClick={handleLLMAnalysis}
-                  disabled={isAnalyzing || rateLimit.remainingRequests === 0}
-                  className={`w-full flex items-center justify-center gap-2 py-3 px-6 rounded-lg font-semibold text-white transition-all shadow-md hover:shadow-lg ${isAnalyzing || rateLimit.remainingRequests === 0
+                  disabled={isAnalyzing || rateLimit.remainingRequests === 0 || (TURNSTILE_SITE_KEY && !turnstileToken)}
+                  className={`w-full flex items-center justify-center gap-2 py-3 px-6 rounded-lg font-semibold text-white transition-all shadow-md hover:shadow-lg ${isAnalyzing || rateLimit.remainingRequests === 0 || (TURNSTILE_SITE_KEY && !turnstileToken)
                     ? 'bg-purple-400 cursor-not-allowed'
                     : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 active:scale-95'
                     }`}
