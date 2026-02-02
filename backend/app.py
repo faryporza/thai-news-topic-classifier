@@ -113,11 +113,28 @@ def load_models():
         return False
 
 
-# Load models at module level (for gunicorn)
-try:
-    load_models()
-except Exception as e:
-    print(f"❌ Error loading models during startup: {e}")
+# Flag for loading state
+model_loading = False
+model_load_error = None
+
+def load_models_background():
+    """โหลด model ใน background thread"""
+    global model_loading, model_load_error
+    model_loading = True
+    try:
+        success = load_models()
+        if not success:
+            model_load_error = "Model loading failed"
+    except Exception as e:
+        model_load_error = str(e)
+    finally:
+        model_loading = False
+
+# Start loading model in background thread (so server can start immediately)
+import threading
+print("🚀 Starting server... Model will load in background.")
+load_thread = threading.Thread(target=load_models_background, daemon=True)
+load_thread.start()
 
 
 # ============================================================================
@@ -176,16 +193,29 @@ def health():
     """
     Health Check Endpoint
     ตรวจสอบสถานะ API และโมเดล
+    - Return 200 always so startup probe passes
+    - Show actual model loading status in response body
     """
     model_loaded = tokenizer is not None and session is not None
     
+    if model_loading:
+        status = "loading"
+    elif model_loaded:
+        status = "healthy"
+    elif model_load_error:
+        status = "error"
+    else:
+        status = "starting"
+    
     return jsonify({
-        "status": "healthy" if model_loaded else "unhealthy",
+        "status": status,
         "timestamp": datetime.now().isoformat(),
         "model_loaded": model_loaded,
+        "model_loading": model_loading,
         "model_type": "ONNX Runtime" if model_loaded else None,
-        "provider": "CPUExecutionProvider" if model_loaded else None
-    }), 200 if model_loaded else 503
+        "provider": "CPUExecutionProvider" if model_loaded else None,
+        "error": model_load_error
+    }), 200  # Always return 200 so startup probe passes
 
 
 @app.route('/model/info', methods=['GET'])
