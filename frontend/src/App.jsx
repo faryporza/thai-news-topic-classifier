@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Trash2,
   BarChart2,
@@ -52,26 +52,62 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Load Turnstile script
+  // Turnstile ref
+  const turnstileWidgetId = useRef(null);
+
+  // Load Turnstile script and render widget
   useEffect(() => {
     if (!TURNSTILE_SITE_KEY) return;
 
-    // Define global callback for Turnstile
-    window.onTurnstileSuccess = (token) => {
-      setTurnstileToken(token);
-    };
+    // Check if already loaded
+    if (window.turnstile) {
+      setTurnstileLoaded(true);
+      return;
+    }
+
+    // Check if script already exists
+    const existingScript = document.querySelector('script[src*="turnstile"]');
+    if (existingScript) {
+      setTurnstileLoaded(true);
+      return;
+    }
 
     const script = document.createElement('script');
-    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
     script.async = true;
     script.onload = () => setTurnstileLoaded(true);
     document.body.appendChild(script);
 
-    return () => {
-      document.body.removeChild(script);
-      delete window.onTurnstileSuccess;
-    };
+    // Don't remove script on cleanup - it should stay loaded
   }, []);
+
+  // Callback ref to store container element
+  const turnstileContainerRef = useRef(null);
+  const turnstileRefCallback = (element) => {
+    turnstileContainerRef.current = element;
+    // Try to render immediately if script is already loaded
+    if (element && window.turnstile && !turnstileWidgetId.current) {
+      turnstileWidgetId.current = window.turnstile.render(element, {
+        sitekey: TURNSTILE_SITE_KEY,
+        callback: (token) => setTurnstileToken(token),
+        theme: 'light',
+        size: 'compact'
+      });
+    }
+  };
+
+  // Render Turnstile if script loads after container is attached
+  useEffect(() => {
+    if (!turnstileLoaded || !turnstileContainerRef.current || turnstileWidgetId.current) return;
+    if (!window.turnstile) return;
+
+    turnstileWidgetId.current = window.turnstile.render(turnstileContainerRef.current, {
+      sitekey: TURNSTILE_SITE_KEY,
+      callback: (token) => setTurnstileToken(token),
+      theme: 'light',
+      size: 'compact'
+    });
+  }, [turnstileLoaded]);
 
   useEffect(() => {
     checkHealth();
@@ -197,8 +233,8 @@ export default function App() {
     });
 
     // Reset Turnstile after use
-    if (window.turnstile && TURNSTILE_SITE_KEY) {
-      window.turnstile.reset();
+    if (window.turnstile && TURNSTILE_SITE_KEY && turnstileWidgetId.current) {
+      window.turnstile.reset(turnstileWidgetId.current);
       setTurnstileToken(null);
     }
 
@@ -384,17 +420,14 @@ export default function App() {
                 </div>
 
                 {/* Cloudflare Turnstile Widget */}
-                {TURNSTILE_SITE_KEY && turnstileLoaded && (
-                  <div className="flex items-center gap-2">
+                {TURNSTILE_SITE_KEY && (
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Shield className="w-4 h-4 text-green-600" />
-                    <span className="text-xs text-slate-500">Bot Protection by Cloudflare</span>
-                    <div
-                      className="cf-turnstile"
-                      data-sitekey={TURNSTILE_SITE_KEY}
-                      data-callback="onTurnstileSuccess"
-                      data-theme="light"
-                      data-size="compact"
-                    ></div>
+                    <span className="text-xs text-slate-500">Bot Protection</span>
+                    <div ref={turnstileRefCallback}></div>
+                    {turnstileToken && (
+                      <span className="text-xs text-green-600">✓ Verified</span>
+                    )}
                   </div>
                 )}
 
