@@ -91,7 +91,7 @@ export default function App() {
         sitekey: TURNSTILE_SITE_KEY,
         callback: (token) => setTurnstileToken(token),
         theme: 'light',
-        size: 'compact'
+        size: 'invisible'  // Invisible mode for cleaner UI
       });
     }
   };
@@ -105,7 +105,7 @@ export default function App() {
       sitekey: TURNSTILE_SITE_KEY,
       callback: (token) => setTurnstileToken(token),
       theme: 'light',
-      size: 'compact'
+      size: 'invisible'  // Invisible mode for cleaner UI
     });
   }, [turnstileLoaded]);
 
@@ -419,15 +419,16 @@ export default function App() {
                   <span className="text-slate-400">Rate limit: 1 ครั้ง/นาที</span>
                 </div>
 
-                {/* Cloudflare Turnstile Widget */}
+                {/* Cloudflare Turnstile Widget (Invisible Mode) */}
                 {TURNSTILE_SITE_KEY && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Shield className="w-4 h-4 text-green-600" />
-                    <span className="text-xs text-slate-500">Bot Protection</span>
-                    <div ref={turnstileRefCallback}></div>
-                    {turnstileToken && (
-                      <span className="text-xs text-green-600">✓ Verified</span>
+                  <div className="flex items-center gap-2 text-xs">
+                    <Shield className={`w-4 h-4 ${turnstileToken ? 'text-green-500' : 'text-slate-400'}`} />
+                    {turnstileToken ? (
+                      <span className="text-green-600 font-medium">✓ Bot protection verified</span>
+                    ) : (
+                      <span className="text-slate-500">Verifying...</span>
                     )}
+                    <div ref={turnstileRefCallback} className="hidden"></div>
                   </div>
                 )}
 
