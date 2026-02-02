@@ -24,8 +24,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime
 from huggingface_hub import snapshot_download
-import onnxruntime as ort
-from transformers import AutoTokenizer
+# Note: onnxruntime and transformers are imported lazily in load_models()
 
 # ============================================================================
 # Flask App Configuration
@@ -74,6 +73,11 @@ def load_models():
     global tokenizer, session
     
     try:
+        # Lazy import heavy libraries (so gunicorn can start first)
+        print("📦 Importing onnxruntime and transformers...")
+        import onnxruntime as ort
+        from transformers import AutoTokenizer
+        
         onnx_path = os.path.join(LOCAL_DIR, "model.onnx")
         tokenizer_path = os.path.join(LOCAL_DIR, "tokenizer")
         
