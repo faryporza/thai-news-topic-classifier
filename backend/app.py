@@ -74,23 +74,28 @@ def load_models():
     global tokenizer, session
     
     try:
-        # Download model from Hugging Face Hub
-        print(f"📥 Downloading model from {REPO_ID}...")
-        snapshot_download(
-            repo_id=REPO_ID,
-            repo_type="model",
-            local_dir=LOCAL_DIR,
-            local_dir_use_symlinks=False
-        )
-        print(f"   ✅ Downloaded to {LOCAL_DIR}")
+        onnx_path = os.path.join(LOCAL_DIR, "model.onnx")
+        tokenizer_path = os.path.join(LOCAL_DIR, "tokenizer")
+        
+        # Check if model already exists (pre-downloaded in Docker image)
+        if os.path.exists(onnx_path):
+            print(f"✅ Model already exists at {LOCAL_DIR}, skipping download...")
+        else:
+            # Download model from Hugging Face Hub
+            print(f"📥 Downloading model from {REPO_ID}...")
+            snapshot_download(
+                repo_id=REPO_ID,
+                repo_type="model",
+                local_dir=LOCAL_DIR,
+                local_dir_use_symlinks=False
+            )
+            print(f"   ✅ Downloaded to {LOCAL_DIR}")
         
         # Load tokenizer
-        tokenizer_path = os.path.join(LOCAL_DIR, "tokenizer")
         print(f"📥 Loading tokenizer from {tokenizer_path}...")
         tokenizer = AutoTokenizer.from_pretrained(tokenizer_path, use_fast=True)
         
         # Load ONNX model
-        onnx_path = os.path.join(LOCAL_DIR, "model.onnx")
         print(f"📥 Loading ONNX model from {onnx_path}...")
         session = ort.InferenceSession(onnx_path, providers=["CPUExecutionProvider"])
         
@@ -103,6 +108,8 @@ def load_models():
         
     except Exception as e:
         print(f"❌ Error loading model: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 
