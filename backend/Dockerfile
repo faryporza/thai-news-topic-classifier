@@ -17,5 +17,5 @@ COPY models/ models/
 # Expose port
 EXPOSE 8080
 
-# Run with gunicorn (read PORT from Cloud Run env)
-CMD ["sh", "-c", "exec gunicorn app:app --bind 0.0.0.0:${PORT:-8080} --workers 1 --threads 2 --timeout 120"]
+# Run with gunicorn
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "4", "--timeout", "120"]
