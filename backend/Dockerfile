@@ -21,4 +21,4 @@ RUN python -c "from huggingface_hub import snapshot_download; snapshot_download(
 EXPOSE 8080
 
 # Run with gunicorn
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "2", "--timeout", "120"]
+CMD ["sh", "-c", "exec gunicorn app:app --bind 0.0.0.0:${PORT:-8080} --workers 1 --threads 2 --timeout 120"]
