@@ -7,8 +7,8 @@ venv/
 env/
 .env
 
-# Model files (will be downloaded at build time)
-models/
+# Old ONNX model cache (not needed, joblib models are in models/)
+onnx_model/
 
 # IDE
 .idea/

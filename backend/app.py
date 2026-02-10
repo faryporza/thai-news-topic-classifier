@@ -1,30 +1,29 @@
-#!/usr/bin/env python3 
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Thai News Topic Classifier - Backend API (ONNX Edition)
-=======================================================
-Flask API สำหรับจำแนกหมวดหมู่ข่าวภาษาไทย ด้วย ONNX Runtime
+Thai News Topic Classifier - Backend API (Logistic Regression Edition)
+======================================================================
+Flask API สำหรับจำแนกหมวดหมู่ข่าวภาษาไทย ด้วย TF-IDF + Logistic Regression
 
 Endpoints:
 - GET /health - ตรวจสอบสถานะ API
 - GET /model/info - ข้อมูลโมเดล
 - POST /predict - ทำนายหมวดหมู่ข่าว
 
-Model: farypor/my-thai-news-classifier-onnx (ONNX on Hugging Face Hub)
-- ความแม่นยำ: ~95-100%
-- Inference เร็วกว่า PyTorch 2-3x
-- ไม่ต้องใช้ GPU
+Model: TF-IDF + Logistic Regression (joblib)
+- ความแม่นยำ: ~95-100% (บน test set)
+- Inference เร็วมาก (ไม่ต้องใช้ GPU)
+- Cold start เร็ว (โมเดลเล็ก)
 """
 
 import os
 import re
 import time
+import joblib
 import numpy as np
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime
-from huggingface_hub import snapshot_download
-# Note: onnxruntime and transformers are imported lazily in load_models()
 
 # ============================================================================
 # Flask App Configuration
@@ -33,116 +32,70 @@ app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
 # ============================================================================
-# Load Model from Hugging Face Hub (ONNX)
+# Load Model (Logistic Regression + TF-IDF)
 # ============================================================================
-REPO_ID = "farypor/my-thai-news-classifier-onnx"
-LOCAL_DIR = "onnx_model"
-MAX_LENGTH = 192
+MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
 
-# Global model and tokenizer
-tokenizer = None
-session = None
-
-# Label mapping
-ID2LABEL = {0: "Business", 1: "SciTech", 2: "World"}
-LABEL2ID = {"Business": 0, "SciTech": 1, "World": 2}
+# Global model and vectorizer
+vectorizer = None
+model = None
+model_loaded = False
+model_load_error = None
 
 model_info = {
     "name": "Thai News Topic Classifier",
-    "version": "2.1.0",
-    "algorithm": "WangchanBERTa + ONNX",
-    "model_type": "ONNX Runtime",
-    "model_id": REPO_ID,
-    "base_model": "airesearch/wangchanberta-base-att-spm-uncased",
+    "version": "3.0.0",
+    "algorithm": "TF-IDF + Logistic Regression",
+    "model_type": "scikit-learn (joblib)",
+    "base_model": "Logistic Regression with TF-IDF (unigram + bigram)",
     "classes": ["Business", "SciTech", "World"],
-    "created_at": "2026-01-31",
-    "description": "โมเดลจำแนกหมวดหมู่ข่าวภาษาไทย 3 หมวด ด้วย ONNX Runtime",
+    "created_at": "2026-01-27",
+    "description": "โมเดลจำแนกหมวดหมู่ข่าวภาษาไทย 3 หมวด ด้วย TF-IDF + Logistic Regression",
     "advantages": [
-        "Inference เร็วกว่า PyTorch 2-3x",
+        "Inference เร็วมาก",
         "ไม่ต้องใช้ GPU",
-        "ไฟล์เล็กลง",
+        "Cold start เร็ว (โมเดลเล็ก)",
         "Deploy ง่าย"
     ],
-    "accuracy": "100% (บน test set)",
-    "max_length": MAX_LENGTH
+    "accuracy": "~95-100% (บน test set)",
 }
 
 
 def load_models():
-    """โหลด ONNX Model และ Tokenizer จาก Hugging Face Hub"""
-    global tokenizer, session
-    
+    """โหลด TF-IDF Vectorizer และ Logistic Regression Model จาก joblib"""
+    global vectorizer, model, model_loaded, model_load_error
+
     try:
-        # Lazy import heavy libraries (so gunicorn can start first)
-        print("📦 Importing onnxruntime and transformers...")
-        import onnxruntime as ort
-        from transformers import AutoTokenizer
-        
-        onnx_path = os.path.join(LOCAL_DIR, "model.onnx")
-        tokenizer_path = os.path.join(LOCAL_DIR, "tokenizer")
-        
-        # Check if model already exists (pre-downloaded in Docker image)
-        if os.path.exists(onnx_path):
-            print(f"✅ Model already exists at {LOCAL_DIR}, skipping download...")
-        else:
-            # Download model from Hugging Face Hub
-            print(f"📥 Downloading model from {REPO_ID}...")
-            snapshot_download(
-                repo_id=REPO_ID,
-                repo_type="model",
-                local_dir=LOCAL_DIR,
-                local_dir_use_symlinks=False
-            )
-            print(f"   ✅ Downloaded to {LOCAL_DIR}")
-        
-        # Load tokenizer
-        print(f"📥 Loading tokenizer from {tokenizer_path}...")
-        tokenizer = AutoTokenizer.from_pretrained(tokenizer_path, use_fast=True)
-        
-        # Load ONNX model
-        print(f"📥 Loading ONNX model from {onnx_path}...")
-        session = ort.InferenceSession(onnx_path, providers=["CPUExecutionProvider"])
-        
-        print(f"✅ ONNX model loaded successfully!")
-        print(f"   - Model ID: {REPO_ID}")
-        print(f"   - Provider: CPUExecutionProvider")
-        print(f"   - Labels: {ID2LABEL}")
-        
+        vectorizer_path = os.path.join(MODEL_DIR, "tfidf_vectorizer.joblib")
+        model_path = os.path.join(MODEL_DIR, "logistic_regression_model.joblib")
+
+        print(f"📥 Loading TF-IDF vectorizer from {vectorizer_path}...")
+        vectorizer = joblib.load(vectorizer_path)
+
+        print(f"📥 Loading Logistic Regression model from {model_path}...")
+        model = joblib.load(model_path)
+
+        model_loaded = True
+        print(f"✅ Models loaded successfully!")
+        print(f"   - Vectorizer vocab size: {len(vectorizer.vocabulary_):,}")
+        print(f"   - Model classes: {list(model.classes_)}")
         return True
-        
+
     except Exception as e:
+        model_load_error = str(e)
         print(f"❌ Error loading model: {e}")
         import traceback
         traceback.print_exc()
         return False
 
 
-# Flag for loading state
-model_loading = False
-model_load_error = None
-
-def load_models_background():
-    """โหลด model ใน background thread"""
-    global model_loading, model_load_error
-    model_loading = True
-    try:
-        success = load_models()
-        if not success:
-            model_load_error = "Model loading failed"
-    except Exception as e:
-        model_load_error = str(e)
-    finally:
-        model_loading = False
-
-# Start loading model in background thread (so server can start immediately)
-import threading
-print("🚀 Starting server... Model will load in background.")
-load_thread = threading.Thread(target=load_models_background, daemon=True)
-load_thread.start()
+# Load models at startup (fast — joblib models are small)
+print("🚀 Starting server... Loading models...")
+load_models()
 
 
 # ============================================================================
-# Text Preprocessing
+# Text Preprocessing (same as training)
 # ============================================================================
 def preprocess_text(text: str) -> str:
     """
@@ -150,28 +103,22 @@ def preprocess_text(text: str) -> str:
     """
     if text is None:
         return ""
-    
+
     text = str(text)
-    
+
     # 1. Whitespace Normalization
     text = re.sub(r'\s+', ' ', text)
-    
+
     # 2. Strip
     text = text.strip()
-    
+
     # 3. Thai Digits Normalization
     thai_digits = '๐๑๒๓๔๕๖๗๘๙'
     arabic_digits = '0123456789'
     for thai, arabic in zip(thai_digits, arabic_digits):
         text = text.replace(thai, arabic)
-    
+
     return text
-
-
-def softmax(x):
-    """Compute softmax values"""
-    exp_x = np.exp(x - np.max(x, axis=1, keepdims=True))
-    return exp_x / np.sum(exp_x, axis=1, keepdims=True)
 
 
 # ============================================================================
@@ -182,8 +129,8 @@ def home():
     """Home endpoint"""
     return jsonify({
         "message": "Thai News Topic Classifier API",
-        "version": "2.1.0",
-        "model": "ONNX Runtime",
+        "version": "3.0.0",
+        "model": "TF-IDF + Logistic Regression",
         "endpoints": [
             "GET /health",
             "GET /model/info",
@@ -197,27 +144,19 @@ def health():
     """
     Health Check Endpoint
     ตรวจสอบสถานะ API และโมเดล
-    - Return 200 always so startup probe passes
-    - Show actual model loading status in response body
     """
-    model_loaded = tokenizer is not None and session is not None
-    
-    if model_loading:
-        status = "loading"
-    elif model_loaded:
+    if model_loaded:
         status = "healthy"
     elif model_load_error:
         status = "error"
     else:
         status = "starting"
-    
+
     return jsonify({
         "status": status,
         "timestamp": datetime.now().isoformat(),
         "model_loaded": model_loaded,
-        "model_loading": model_loading,
-        "model_type": "ONNX Runtime" if model_loaded else None,
-        "provider": "CPUExecutionProvider" if model_loaded else None,
+        "model_type": "TF-IDF + Logistic Regression" if model_loaded else None,
         "error": model_load_error
     }), 200  # Always return 200 so startup probe passes
 
@@ -228,17 +167,16 @@ def get_model_info():
     Model Info Endpoint
     แสดงข้อมูลโมเดล
     """
-    if tokenizer is None or session is None:
+    if not model_loaded:
         return jsonify({
             "error": "Model not loaded"
         }), 503
-    
-    # Build info response
+
     info = model_info.copy()
-    info["vocabulary_size"] = len(tokenizer)
+    info["vocabulary_size"] = len(vectorizer.vocabulary_)
     info["model_loaded"] = True
-    info["id2label"] = ID2LABEL
-    
+    info["model_classes"] = list(model.classes_)
+
     return jsonify(info)
 
 
@@ -246,100 +184,83 @@ def get_model_info():
 def predict():
     """
     Predict Endpoint
-    ทำนายหมวดหมู่ข่าวด้วย ONNX Runtime
-    
+    ทำนายหมวดหมู่ข่าวด้วย TF-IDF + Logistic Regression
+
     Request Body:
     {
         "headline": "พาดหัวข่าว",
         "body": "เนื้อหาข่าว"
     }
-    
+
     Response:
     {
         "label": "Business",
         "confidence": 0.95,
         "probabilities": {...},
-        "latency_ms": 15,
-        "model_version": "2.1.0",
-        "model_type": "ONNX Runtime"
+        "latency_ms": 5,
+        "model_version": "3.0.0",
+        "model_type": "TF-IDF + Logistic Regression"
     }
     """
     start_time = time.time()
-    
+
     # ตรวจสอบว่าโหลดโมเดลแล้วหรือยัง
-    if tokenizer is None or session is None:
+    if not model_loaded:
         return jsonify({
             "error": "Model not loaded",
             "message": "กรุณารอโมเดลโหลดเสร็จ"
         }), 503
-    
+
     # รับ request data
     data = request.get_json()
-    
+
     if not data:
         return jsonify({
             "error": "No data provided",
             "message": "กรุณาส่ง JSON body"
         }), 400
-    
+
     headline = data.get('headline', '')
     body = data.get('body', '')
-    
+
     if not headline and not body:
         return jsonify({
             "error": "Missing required fields",
             "message": "กรุณากรอก headline หรือ body อย่างน้อย 1 อย่าง"
         }), 400
-    
+
     # รวม headline และ body
     text = headline + ' ' + body
-    
+
     # Preprocess
     text = preprocess_text(text)
-    
-    # Tokenize
-    # Tokenize (FAST VERSION)
-    inputs = tokenizer(
-        text,
-        return_tensors="np",
-        truncation=True,
-        max_length=MAX_LENGTH,   # 128 หรือ 192
-        padding="longest"        # ⭐ สำคัญมาก
-    )
-    
-    # Run ONNX inference
-    logits = session.run(
-        None,
-        {
-            "input_ids": inputs["input_ids"],
-            "attention_mask": inputs["attention_mask"]
-        }
-    )[0]
-    
-    # Calculate probabilities
-    probs = softmax(logits)[0]
-    predicted_id = int(np.argmax(probs))
-    
+
+    # TF-IDF transform
+    X = vectorizer.transform([text])
+
+    # Predict
+    predicted_label = model.predict(X)[0]
+    probabilities = model.predict_proba(X)[0]
+
     # Calculate latency
     end_time = time.time()
     latency_ms = round((end_time - start_time) * 1000, 2)
-    
-    # Build response
-    predicted_label = ID2LABEL[predicted_id]
-    confidence = float(probs[predicted_id])
-    
+
+    # Build probability dict
     prob_dict = {
-        ID2LABEL[i]: float(probs[i])
-        for i in range(len(probs))
+        cls: float(prob)
+        for cls, prob in zip(model.classes_, probabilities)
     }
-    
+
+    confidence = float(max(probabilities))
+
     return jsonify({
         "label": predicted_label,
         "confidence": confidence,
         "probabilities": prob_dict,
         "latency_ms": latency_ms,
         "model_version": model_info["version"],
-        "model_type": "ONNX Runtime",
+        "model_type": "TF-IDF + Logistic Regression",
         "input": {
             "headline": headline[:100] + "..." if len(headline) > 100 else headline,
             "body": body[:200] + "..." if len(body) > 200 else body
@@ -353,16 +274,11 @@ def predict():
 if __name__ == '__main__':
     print("=" * 60)
     print("🇹🇭 Thai News Topic Classifier API")
-    print("   Model: ONNX Runtime (v2.1.0)")
+    print("   Model: TF-IDF + Logistic Regression (v3.0.0)")
     print("=" * 60)
-    
-    # Load models
-    if load_models():
-        print(f"   Classes: {list(ID2LABEL.values())}")
-        print(f"   Vocabulary size: {len(tokenizer)}")
-    
+
     print("\n📡 Starting server...")
     print("   URL: http://localhost:5001")
     print("=" * 60)
-    
+
     app.run(host='0.0.0.0', port=5001, debug=True)
